@@ -10,7 +10,6 @@ type FilenConfig struct {
 	BaseURL  string
 }
 
-// TODO
 func NewFilenProvider(config FilenConfig) *FilenProvider {
 	return &FilenProvider{config: config}
 }
