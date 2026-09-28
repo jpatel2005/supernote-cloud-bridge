@@ -12,9 +12,10 @@ import (
 )
 
 const (
-	filenBaseURL      = "https://gateway.filen.io"
-	filenAuthInfoPath = "/v3/auth/info"
-	filenLoginPath    = "/v3/login"
+	filenBaseURL        = "https://gateway.filen.io"
+	filenAuthInfoPath   = "/v3/auth/info"
+	filenLoginPath      = "/v3/login"
+	filenMasterKeysPath = "/v3/user/masterKeys"
 )
 
 type FilenProvider struct {
@@ -60,6 +61,14 @@ type filenLoginData struct {
 	PrivateKey string `json:"privateKey"`
 }
 
+type filenMasterKeysRequest struct {
+	MasterKeys string `json:"masterKeys"`
+}
+
+type filenMasterKeysData struct {
+	Keys string `json:"keys"`
+}
+
 func NewFilenProvider(config FilenConfig) *FilenProvider {
 	return &FilenProvider{config: config, client: &http.Client{Timeout: 10 * time.Second}}
 }
@@ -74,7 +83,7 @@ func (p *FilenProvider) Authenticate(ctx context.Context) error {
 	var authInfo filenAPIResponse[filenAuthInfoData]
 	err := p.postJSON(ctx, filenAuthInfoPath, filenAuthInfoRequest{
 		Email: p.config.Email,
-	}, &authInfo)
+	}, &authInfo, "")
 	if err != nil {
 		return fmt.Errorf("fetch filen auth info: %w", err)
 	}
@@ -97,7 +106,7 @@ func (p *FilenProvider) Authenticate(ctx context.Context) error {
 		Password:      keys.DerivedPassword,
 		TwoFactorCode: "XXXXXX", // 2FA not supported
 		AuthVersion:   authInfo.Data.AuthVersion,
-	}, &loginInfo)
+	}, &loginInfo, "")
 	if err != nil {
 		return fmt.Errorf("log in to filen: %w", err)
 	}
@@ -118,7 +127,7 @@ func (p *FilenProvider) Authenticate(ctx context.Context) error {
 	return nil
 }
 
-func (p *FilenProvider) postJSON(ctx context.Context, endpoint string, requestBody any, responseBody any) error {
+func (p *FilenProvider) postJSON(ctx context.Context, endpoint string, requestBody any, responseBody any, apiKey string) error {
 	requestBodyJSON, err := json.Marshal(requestBody)
 	if err != nil {
 		return fmt.Errorf("marshal request body: %w", err)
@@ -129,7 +138,9 @@ func (p *FilenProvider) postJSON(ctx context.Context, endpoint string, requestBo
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
-
+	if apiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+apiKey)
+	}
 	resp, err := p.client.Do(req)
 	if err != nil {
 		return fmt.Errorf("do request: %w", err)
